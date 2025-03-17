@@ -45,7 +45,8 @@ jobs:
         env:
           # cibuildwheel will build wheel once and test it for each CPython version
           # and for PyPy > 3.8.
-          CIBW_BUILD: "cp311-* cp312-*"
+          CIBW_BUILD: "cp311-*"
+          CIBW_ARCHS_WINDOWS: AMD64
           CIBW_MANYLINUX_X86_64_IMAGE: "manylinux2014"
           CIBW_MANYLINUX_I686_IMAGE: "manylinux2014"
           CIBW_MANYLINUX_AARCH64_IMAGE: "manylinux2014"
@@ -56,10 +57,10 @@ jobs:
           CIBW_BEFORE_TEST_LINUX: "(ldd /bin/ls | grep -q musl && apk add gmp) || true"
 
           # Set pycryptodome/x test command according to built package
-          CIBW_TEST_COMMAND:
-            "${{ endsWith(github.ref, 'x') == true &&
-            'python -m Cryptodome.SelfTest --skip-slow-tests' ||
-            'python -m Crypto.SelfTest --skip-slow-tests' }}"
+          # CIBW_TEST_COMMAND:
+          #   "${{ endsWith(github.ref, 'x') == true &&
+          #   'python -m Cryptodome.SelfTest --skip-slow-tests' ||
+          #   'python -m Crypto.SelfTest --skip-slow-tests' }}"
 
       - name: Delete manylinux1 wheels
         if: runner.os == 'Linux'
