@@ -1,0 +1,73 @@
+name: Wheels
+
+on:
+  workflow_dispatch:  # 允许手动触发构建
+
+jobs:
+  build_source:
+    name: Build source package
+    runs-on: [ ubuntu-latest ]
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-python@v5
+        name: Install Python
+        with:
+          python-version: '3.x'
+
+      - name: Build source package (.tar.gz)
+        run: |
+          python -m pip install setuptools
+          python setup.py sdist
+
+      - uses: actions/upload-artifact@v4
+        with:
+          name: source-${{ github.ref_name }}
+          path: ./dist/*.tar.gz
+
+  build_python3_wheels:
+    name: Build Python 3 wheels on ${{ matrix.os }}
+    runs-on: ${{ matrix.os }}
+    strategy:
+      matrix:
+        os: [windows-2019]
+
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Select architecture for MacOS
+        run: |
+          echo 'CIBW_ARCHS=x86_64 universal2' >> $GITHUB_ENV
+        if: runner.os == 'macOS'
+
+      - uses: pypa/cibuildwheel@v2.22.0
+        name: Build wheels
+        env:
+          # cibuildwheel will build wheel once and test it for each CPython version
+          # and for PyPy > 3.8.
+          CIBW_BUILD: "cp311-* cp312-*"
+          CIBW_MANYLINUX_X86_64_IMAGE: "manylinux2014"
+          CIBW_MANYLINUX_I686_IMAGE: "manylinux2014"
+          CIBW_MANYLINUX_AARCH64_IMAGE: "manylinux2014"
+          CIBW_MANYLINUX_PYPY_X86_64_IMAGE: "manylinux2014"
+          CIBW_MANYLINUX_PYPY_I686_IMAGE: "manylinux2014"
+          CIBW_MANYLINUX_PYPY_AARCH64_IMAGE: "manylinux2014"
+          CIBW_ENABLE: "cpython-freethreading pypy"
+          CIBW_BEFORE_TEST_LINUX: "(ldd /bin/ls | grep -q musl && apk add gmp) || true"
+
+          # Set pycryptodome/x test command according to built package
+          CIBW_TEST_COMMAND:
+            "${{ endsWith(github.ref, 'x') == true &&
+            'python -m Cryptodome.SelfTest --skip-slow-tests' ||
+            'python -m Crypto.SelfTest --skip-slow-tests' }}"
+
+      - name: Delete manylinux1 wheels
+        if: runner.os == 'Linux'
+        run: |
+          rm -f wheelhouse/*-manylinux1_*.whl
+
+      - uses: actions/upload-artifact@v4
+        with:
+          name: wheels-python3-${{ matrix.os }}-${{ github.ref_name }}
+          overwrite: true
+          path: ./wheelhouse/*.whl
