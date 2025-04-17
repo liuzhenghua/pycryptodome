@@ -45,7 +45,8 @@ jobs:
         env:
           # cibuildwheel will build wheel once and test it for each CPython version
           # and for PyPy > 3.8.
-          CIBW_BUILD: "cp311-*"
+          # CIBW_BUILD: "cp311-*"
+          CIBW_SKIP: "cp36* cp37* cp38* cp39* cp310* pp*"
           CIBW_ARCHS_WINDOWS: AMD64
           CIBW_MANYLINUX_X86_64_IMAGE: "manylinux2014"
           CIBW_MANYLINUX_I686_IMAGE: "manylinux2014"
@@ -67,8 +68,35 @@ jobs:
         run: |
           rm -f wheelhouse/*-manylinux1_*.whl
 
-      - uses: actions/upload-artifact@v4
+      # - uses: actions/upload-artifact@v4
+      #   with:
+      #     name: wheels-python3-${{ matrix.os }}-${{ github.ref_name }}
+      #     overwrite: true
+      #     path: ./wheelhouse/*.whl
+
+      - name: Generate Timestamp
+        id: timestamp
+        run: echo "TAG_NAME=v$(date +'%Y%m%d%H%M')" >> $GITHUB_ENV
+        shell: bash
+
+      - name: Create Release
+        id: create_release
+        uses: actions/create-release@v1
         with:
-          name: wheels-python3-${{ matrix.os }}-${{ github.ref_name }}
-          overwrite: true
-          path: ./wheelhouse/*.whl
+          tag_name: ${{env.TAG_NAME}}
+          release_name: 'Release - ${{env.TAG_NAME}}'
+          body: 'Release notes for ${{env.TAG_NAME}}'
+          draft: false
+          prerelease: false
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+
+      - name: Upload each wheel to GitHub Releases (Bash)
+        shell: bash
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        run: |
+          for wheel in wheelhouse/*.whl; do
+            echo "Uploading $wheel"
+            gh release upload "$TAG_NAME" "$wheel"
+          done
